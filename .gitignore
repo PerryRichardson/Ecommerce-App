@@ -7,7 +7,8 @@ __pycache__/
 
 # Env & secrets (do NOT commit)
 .env
-.env.*
+.env.*        # ignores .env.local, .env.dev, etc.
+!.env.example # keep this template in Git
 
 # Databases generated locally
 db.sqlite3
