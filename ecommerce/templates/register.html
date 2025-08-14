@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .messages { margin-bottom: 15px; padding: 10px; border-radius: 4px; }
+    .messages.error { background-color: #f8d7da; color: #721c24; }
+    .messages.success { background-color: #d4edda; color: #155724; }
+    .nav { margin-bottom: 20px; }
+    .nav a { margin-right: 15px; text-decoration: none; color: purple; }
+    .nav a:hover { text-decoration: underline; }
+    form { max-width: 420px; }
+    label { font-weight: bold; display: block; margin-top: 10px; }
+    input, select, button { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    {% if user.is_authenticated %}
+      <a href="{% url 'ecommerce:welcome' %}">Home</a>
+      <a href="{% url 'ecommerce:view_cart' %}">Cart</a>
+      {% if perms.ecommerce.can_change_product_price %}
+        <a href="{% url 'ecommerce:change_price' %}">Change Product Price</a>
+      {% endif %}
+      <a href="{% url 'ecommerce:logout' %}">Logout</a>
+    {% else %}
+      <a href="{% url 'ecommerce:login' %}">Login</a>
+      <a href="{% url 'ecommerce:register' %}">Register</a>
+    {% endif %}
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="messages {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <h2>Register</h2>
+
+  <form method="post" action="{% url 'ecommerce:register' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+
+    <label for="username">Username</label>
+    <input type="text" name="username" id="username" required autocomplete="username">
+
+    <label for="password">Password</label>
+    <input type="password" name="password" id="password" required autocomplete="new-password">
+
+    <label for="email">Email (optional)</label>
+    <input type="email" name="email" id="email" autocomplete="email">
+
+    <label for="account_type">Account Type</label>
+    <select name="account_type" id="account_type" required>
+      <option value="">-- Select an account type --</option>
+      <option value="buyer">Buyer</option>
+      <option value="vendor">Vendor</option>
+    </select>
+
+    <button type="submit">Register</button>
+  </form>
+
+  {% if not user.is_authenticated %}
+    <p>Already have an account? <a href="{% url 'ecommerce:login' %}">Login here</a></p>
+  {% endif %}
+</body>
+</html>

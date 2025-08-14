@@ -1,0 +1,35 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Env & secrets (do NOT commit)
+.env
+.env.*
+
+# Databases generated locally
+db.sqlite3
+*.sqlite3
+
+# Media (if you ever store uploads locally)
+media/
+
+# Virtual environments
+venv/
+.venv/
+
+# Test/coverage caches
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Static build output (if you ever collect locally)
+staticfiles/

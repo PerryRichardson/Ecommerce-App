@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Change Product Price</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .nav { margin-bottom: 20px; }
+    .nav a { margin-right: 15px; text-decoration: none; color: purple; }
+    .nav a:hover { text-decoration: underline; }
+    .messages { margin-bottom: 15px; padding: 10px; border-radius: 4px; }
+    .messages.error { background: #f8d7da; color: #721c24; }
+    .messages.success { background: #d4edda; color: #155724; }
+    form { max-width: 420px; }
+    label { font-weight: bold; display: block; margin-top: 10px; }
+    input, button { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    {% if user.is_authenticated %}
+      <a href="{% url 'ecommerce:welcome' %}">Home</a>
+      <a href="{% url 'ecommerce:view_cart' %}">Cart</a>
+      {% if perms.ecommerce.can_change_product_price %}
+        <a href="{% url 'ecommerce:change_price' %}">Change Product Price</a>
+      {% endif %}
+      <a href="{% url 'ecommerce:logout' %}">Logout</a>
+    {% else %}
+      <a href="{% url 'ecommerce:login' %}">Login</a>
+      <a href="{% url 'ecommerce:register' %}">Register</a>
+    {% endif %}
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="messages {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <h2>Change Product Price</h2>
+
+  {% if perms.ecommerce.can_change_product_price %}
+    <p>This page is protected by the <strong>can_change_product_price</strong> permission.</p>
+
+    <!-- Optional scaffold if you later implement price updates in this view -->
+    <form method="post" action="">
+      {% csrf_token %}
+      <label for="product_id">Product ID</label>
+      <input type="number" id="product_id" name="product_id" required>
+
+      <label for="new_price">New Price</label>
+      <input type="number" id="new_price" name="new_price" step="0.01" min="0" required>
+
+      <button type="submit">Update Price</button>
+    </form>
+  {% else %}
+    <p>You do not have permission to change product prices.</p>
+  {% endif %}
+</body>
+</html>

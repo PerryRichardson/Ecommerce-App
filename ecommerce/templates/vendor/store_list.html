@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Your Stores</title></head>
+<body>
+  <div class="nav">
+    <a href="{% url 'ecommerce:welcome' %}">Home</a>
+    <a href="{% url 'ecommerce:store_create' %}">New Store</a>
+    <a href="{% url 'ecommerce:product_list' %}">Your Products</a>
+    <a href="{% url 'ecommerce:logout' %}">Logout</a>
+  </div>
+
+  <h2>Your Stores</h2>
+  {% if stores %}
+    <ul>
+      {% for s in stores %}
+        <li>
+          <strong>{{ s.name }}</strong>
+          <div>
+            <a href="{% url 'ecommerce:store_update' s.id %}">Edit</a> |
+            <a href="{% url 'ecommerce:store_delete' s.id %}">Delete</a>
+          </div>
+          <p>{{ s.description }}</p>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No stores yet.</p>
+  {% endif %}
+</body>
+</html>

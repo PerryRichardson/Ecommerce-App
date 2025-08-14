@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Your Cart</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 600px; max-width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: middle; }
+    th { text-align: left; background: #f3f3f3; }
+    .total { font-weight: bold; }
+    .nav a { margin-right: 12px; color: purple; text-decoration: none; }
+    .nav a:hover { text-decoration: underline; }
+    form.inline { display: inline; }
+    input.qty { width: 60px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="{% url 'ecommerce:welcome' %}">Home</a>
+    <a href="{% url 'ecommerce:logout' %}">Logout</a>
+  </div>
+
+  <h2>Your Cart</h2>
+
+  {% if items %}
+    <table>
+      <tr>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Price</th>
+        <th>Subtotal</th>
+        <th>Actions</th>
+      </tr>
+      {% for row in items %}
+      <tr>
+        <td>{{ row.product.name }}</td>
+        <td>
+          <!-- Update quantity -->
+          <form class="inline" method="post" action="{% url 'ecommerce:update_cart_qty' row.product.id %}">
+            {% csrf_token %}
+            <input class="qty" type="number" name="qty" value="{{ row.qty }}" min="0">
+            <button type="submit">Update</button>
+          </form>
+        </td>
+        <td>R{{ row.product.price }}</td>
+        <td>R{{ row.subtotal }}</td>
+        <td>
+          <!-- Remove item -->
+          <form class="inline" method="post" action="{% url 'ecommerce:remove_from_cart' row.product.id %}">
+            {% csrf_token %}
+            <button type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      <tr class="total">
+        <td colspan="3">Total</td>
+        <td colspan="2">R{{ total }}</td>
+      </tr>
+    </table>
+
+    <!-- Proceed to checkout -->
+    <form method="get" action="{% url 'ecommerce:checkout' %}" style="margin-top: 10px;">
+      <button type="submit">Proceed to checkout</button>
+    </form>
+
+    <!-- Clear entire cart -->
+    <form method="post" action="{% url 'ecommerce:clear_cart' %}" style="margin-top: 8px;">
+      {% csrf_token %}
+      <button type="submit">Clear cart</button>
+    </form>
+  {% else %}
+    <p>Your cart is empty.</p>
+  {% endif %}
+</body>
+</html>

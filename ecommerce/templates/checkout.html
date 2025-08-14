@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Checkout</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    table { border-collapse: collapse; width: 600px; max-width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #f3f3f3; text-align: left; }
+    .total { font-weight: bold; }
+    .nav a { margin-right: 12px; color: purple; text-decoration: none; }
+    .nav a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="{% url 'ecommerce:view_cart' %}">Back to Cart</a>
+    <a href="{% url 'ecommerce:welcome' %}">Home</a>
+  </div>
+
+  <h2>Checkout</h2>
+
+  {% if items %}
+    <table>
+      <tr>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Price</th>
+        <th>Subtotal</th>
+      </tr>
+      {% for row in items %}
+      <tr>
+        <td>{{ row.product.name }}</td>
+        <td>{{ row.qty }}</td>
+        <td>R{{ row.product.price|floatformat:2 }}</td>
+        <td>R{{ row.subtotal|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total">
+        <td colspan="3">Total</td>
+        <td>R{{ total|floatformat:2 }}</td>
+      </tr>
+    </table>
+
+    <form method="post" action="{% url 'ecommerce:place_order' %}" style="margin-top:12px;">
+      {% csrf_token %}
+      <button type="submit">Place order</button>
+    </form>
+  {% else %}
+    <p>Your cart is empty.</p>
+  {% endif %}
+</body>
+</html>

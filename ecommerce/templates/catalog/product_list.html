@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{ store.name }} — Products</title></head>
+<body>
+  <div class="nav">
+    <a href="{% url 'ecommerce:catalog_store_list' %}">All Stores</a>
+    <a href="{% url 'ecommerce:view_cart' %}">Cart</a>
+    <a href="{% url 'ecommerce:welcome' %}">Home</a>
+  </div>
+
+  <h2>Products at {{ store.name }}</h2>
+
+  <form method="get">
+    <input type="text" name="q" placeholder="Search products…" value="{{ q }}">
+    <button type="submit">Search</button>
+  </form>
+
+  {% if products %}
+    <ul>
+      {% for p in products %}
+        <li>
+          <a href="{% url 'ecommerce:catalog_product_detail' p.id %}">{{ p.name }}</a>
+          — R{{ p.price }}
+          {% if p.stock %}<small>(Stock: {{ p.stock }})</small>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No products found.</p>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Order {{ order.id }} Success</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    ul { line-height: 1.6; }
+    .nav a { margin-right: 12px; color: purple; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="{% url 'ecommerce:welcome' %}">Home</a>
+    <a href="{% url 'ecommerce:catalog_store_list' %}">Continue shopping</a>
+  </div>
+
+  <h2>Thank you! Order #{{ order.id }} was placed successfully.</h2>
+  <p><strong>Total:</strong> R{{ order.total|floatformat:2 }}</p>
+
+  <h3>Items</h3>
+  <ul>
+    {% for item in order.items.all %}
+      <li>{{ item.product.name }} × {{ item.qty }} — R{{ item.price_snapshot|floatformat:2 }}</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

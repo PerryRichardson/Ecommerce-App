@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Permission denied</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    a { color: purple; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .card { max-width: 560px; border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+    h1 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🚫 Permission denied</h1>
+    <p>You don’t have access to view this page.</p>
+
+    {% if not user.is_authenticated %}
+      <p>Please <a href="{% url 'ecommerce:login' %}">log in</a> and try again.</p>
+    {% else %}
+      <p><a href="{% url 'ecommerce:welcome' %}">Go back home</a></p>
+    {% endif %}
+  </div>
+</body>
+</html>
