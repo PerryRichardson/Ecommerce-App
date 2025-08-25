@@ -1,0 +1,12 @@
+<nav class="nav">
+  <a href="{% url 'core:home' %}" class="brand">eCommerce</a>
+  <ul class="right">
+    {% if user.is_authenticated %}
+      <li>Hello, {{ user.username }}</li>
+      <li><a href="{% url 'accounts:logout' %}">Logout</a></li>
+    {% else %}
+      <li><a href="{% url 'accounts:login' %}">Login</a></li>
+      <li><a href="{% url 'accounts:signup' %}">Sign up</a></li>
+    {% endif %}
+  </ul>
+</nav>
