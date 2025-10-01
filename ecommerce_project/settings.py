@@ -29,6 +29,11 @@ INSTALLED_APPS = [
     "core",
     "accounts",
     "catalog",
+    "api",
+
+    # API tooling
+    "rest_framework",
+    "rest_framework_xml",
 ]
 
 MIDDLEWARE = [
@@ -105,6 +110,24 @@ LOGOUT_REDIRECT_URL = "core:home"
 
 # --- Email backend for dev (prints emails to console) ---
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+REST_FRAMEWORK = {
+    # Who can do what by default:
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ],
+    # How clients authenticate (session = site login; basic = Postman tests):
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    # Output formats (module requires XML; keep JSON + browsable for dev):
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+        "rest_framework_xml.renderers.XMLRenderer",
+    ],
+}
 
 # --- Test DB override (fast, isolated) ---
 if "test" in sys.argv:
