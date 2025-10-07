@@ -127,6 +127,13 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.BrowsableAPIRenderer",
         "rest_framework_xml.renderers.XMLRenderer",
     ],
+    # Input formats (module requires XML; keep JSON + form for dev):
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",      # JSON bodies
+        "rest_framework.parsers.FormParser",      # application/x-www-form-urlencoded
+        "rest_framework.parsers.MultiPartParser", # file uploads, multipart/form-data
+        "rest_framework_xml.parsers.XMLParser",   # application/xml
+    ],
 }
 
 # --- Test DB override (fast, isolated) ---

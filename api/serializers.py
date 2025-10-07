@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ecommerce.models import Product, Store
+from ecommerce.models import Product, Store, Review
 
 class ProductSerializer(serializers.ModelSerializer):
     # Helpful read-only context fields
@@ -43,3 +43,17 @@ class StoreSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Authentication required.")
         validated_data["vendor"] = request.user
         return super().create(validated_data)
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user_username = serializers.ReadOnlyField(source="user.username")
+    product_name = serializers.ReadOnlyField(source="product.name")
+
+    class Meta:
+        model = Review
+        fields = [
+            "id", "product", "product_name",
+            "user", "user_username",
+            "rating", "comment", "verified", "created_at",
+        ]
+        # product, user, verified, created_at are set by the server
+        read_only_fields = ("product", "user", "verified", "created_at")

@@ -19,3 +19,11 @@ class IsOwnerOrReadOnly(BasePermission):
             request.user.is_authenticated
             and getattr(getattr(obj, "store", None), "vendor_id", None) == user_id
         )
+
+class IsBuyer(BasePermission):
+    """Allow writes only for users in the 'Buyers' group (reads are open)."""
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        u = request.user
+        return u.is_authenticated and u.groups.filter(name="Buyers").exists()
