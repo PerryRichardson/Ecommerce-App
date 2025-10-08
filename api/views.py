@@ -1,17 +1,14 @@
-
+# api/views.py
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.exceptions import PermissionDenied
 
-from ecommerce.models import Product, Store
-from .serializers import ProductSerializer, StoreSerializer
-from .permissions import IsVendor, IsOwnerOrReadOnly
+from ecommerce.models import Product, Store, Review
+from .serializers import ProductSerializer, StoreSerializer, ReviewSerializer
+from .permissions import IsVendor, IsOwnerOrReadOnly, IsBuyer
 
-from rest_framework.exceptions import ValidationError
-from ecommerce.models import Product, Store, Review  # <-- add Review
-from .serializers import ProductSerializer, StoreSerializer, ReviewSerializer  # <-- add ReviewSerializer
-from .permissions import IsVendor, IsOwnerOrReadOnly, IsBuyer  # <-- add IsBuyer
+
 # -------- Products --------
 
 class ProductListCreateAPIView(generics.ListCreateAPIView):
@@ -77,19 +74,23 @@ class StoreProductListAPIView(generics.ListAPIView):
         # FK is named 'store'; traverse to store.vendor for serializer perf
         return Product.objects.filter(store_id=store_id).select_related("store", "store__vendor")
 
-# -------- Reviews --------
-class StoreReviewListCreateAPIView(generics.ListCreateAPIView):
+
+# -------- Product Reviews (model is product-based) --------
+
+class ProductReviewListCreateAPIView(generics.ListCreateAPIView):
     """
-    GET: List reviews for a store (public).
-    POST: Create a review for a store (Buyers only).
+    GET: List reviews for a product (public).
+    POST: Create a review for a product (Buyers only).
     """
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsBuyer]
 
     def get_queryset(self):
-        store_id = self.kwargs["store_id"]
-        get_object_or_404(Store, pk=store_id)
-        return Review.objects.filter(store_id=store_id).select_related("user", "store")
+        product_id = self.kwargs["product_id"]
+        get_object_or_404(Product, pk=product_id)
+        return Review.objects.filter(product_id=product_id).select_related(
+            "user", "product", "product__store"
+        )
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
@@ -97,15 +98,16 @@ class StoreReviewListCreateAPIView(generics.ListCreateAPIView):
         return ctx
 
     def perform_create(self, serializer):
-        store_id = self.kwargs["store_id"]
-        store = get_object_or_404(Store, pk=store_id)
+        product_id = self.kwargs["product_id"]
+        product = get_object_or_404(Product, pk=product_id)
 
-        # Optional: prevent vendors reviewing their own store
-        if self.request.user.id == getattr(store, "vendor_id", None):
-            raise ValidationError("Vendors cannot review their own store.")
+        # Optional safety: prevent the owning vendor from reviewing their own product
+        owner_vendor_id = getattr(getattr(product, "store", None), "vendor_id", None)
+        if self.request.user.id == owner_vendor_id:
+            raise ValidationError("Vendors cannot review their own product.")
 
-        # Optional: prevent duplicate review (in case constraint error is noisy)
-        if Review.objects.filter(store=store, user=self.request.user).exists():
-            raise ValidationError("You have already reviewed this store.")
+        # Enforce one review per user per product (mirrors the DB constraint)
+        if Review.objects.filter(product=product, user=self.request.user).exists():
+            raise ValidationError("You have already reviewed this product.")
 
-        serializer.save(user=self.request.user, store=store)
+        serializer.save(user=self.request.user, product=product)
