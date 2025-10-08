@@ -17,6 +17,8 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsVendor]
 
+    # Note: DRF already injects request into serializer context by default.
+    # Keeping this override is harmless, but not required.
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
         ctx["request"] = self.request
@@ -24,13 +26,18 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
 
 
 class ProductDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """GET: read (public) | PATCH/PUT/DELETE: owner only (+ price perm for price changes)."""
+    """
+    GET: read (public)
+    PATCH/PUT/DELETE: owner only
+    + price changes require 'ecommerce.can_change_product_price'.
+    """
     queryset = Product.objects.select_related("store", "store__vendor")
     serializer_class = ProductSerializer
     permission_classes = [IsOwnerOrReadOnly]
 
     def perform_update(self, serializer):
-        if "price" in serializer.validated_data and not self.request.user.has_perm(
+        # IMPORTANT: key off request.data to detect submitted fields on PATCH.
+        if "price" in self.request.data and not self.request.user.has_perm(
             "ecommerce.can_change_product_price"
         ):
             raise PermissionDenied("Missing 'ecommerce.can_change_product_price'.")
@@ -50,7 +57,8 @@ class StoreListCreateAPIView(generics.ListCreateAPIView):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        ctx["request"] = self.request  # serializer will set vendor=request.user
+        # Serializer will assign vendor = request.user in create()
+        ctx["request"] = self.request
         return ctx
 
 
@@ -72,7 +80,10 @@ class StoreProductListAPIView(generics.ListAPIView):
         # 404 if the store doesn't exist (clearer than returning an empty list)
         get_object_or_404(Store, pk=store_id)
         # FK is named 'store'; traverse to store.vendor for serializer perf
-        return Product.objects.filter(store_id=store_id).select_related("store", "store__vendor")
+        return (
+            Product.objects.filter(store_id=store_id)
+            .select_related("store", "store__vendor")
+        )
 
 
 # -------- Product Reviews (model is product-based) --------
@@ -101,12 +112,13 @@ class ProductReviewListCreateAPIView(generics.ListCreateAPIView):
         product_id = self.kwargs["product_id"]
         product = get_object_or_404(Product, pk=product_id)
 
-        # Optional safety: prevent the owning vendor from reviewing their own product
+        # Note: Vendors are already blocked by IsBuyer (403).
+        # The check below is an extra guard if roles change later.
         owner_vendor_id = getattr(getattr(product, "store", None), "vendor_id", None)
         if self.request.user.id == owner_vendor_id:
             raise ValidationError("Vendors cannot review their own product.")
 
-        # Enforce one review per user per product (mirrors the DB constraint)
+        # Enforce one review per user per product (mirrors DB constraint).
         if Review.objects.filter(product=product, user=self.request.user).exists():
             raise ValidationError("You have already reviewed this product.")
 

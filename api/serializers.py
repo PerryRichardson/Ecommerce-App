@@ -17,6 +17,7 @@ class ProductSerializer(serializers.ModelSerializer):
     - Validates non-negative price/stock.
     - Enforces that only Vendors can create/update.
     - Enforces that the logged-in vendor owns the target store.
+    - Forbids changing the store on update.
     """
 
     # Helpful read-only context fields for responses
@@ -38,7 +39,7 @@ class ProductSerializer(serializers.ModelSerializer):
         return value
 
     def validate_stock(self, value: int) -> int:
-        # Your model uses PositiveIntegerField, but this gives a clearer API error.
+        # Model uses PositiveIntegerField, but this gives a clearer API error.
         if value is None:
             raise serializers.ValidationError("Stock is required.")
         if value < 0:
@@ -53,6 +54,7 @@ class ProductSerializer(serializers.ModelSerializer):
         - Auth required.
         - User must be in Vendors group.
         - User must own the store associated with the product.
+        - Do not allow changing the store on update.
         """
         request = self.context.get("request")
         if request and request.method in ("POST", "PUT", "PATCH"):
@@ -70,6 +72,14 @@ class ProductSerializer(serializers.ModelSerializer):
 
             if store.vendor_id != user.id:
                 raise serializers.ValidationError("You do not own this store.")
+
+            # Forbid changing the store on update
+            if self.instance is not None and "store" in attrs:
+                incoming_store: Store = attrs["store"]
+                if incoming_store.pk != self.instance.store_id:
+                    raise serializers.ValidationError(
+                        {"store": "Changing the store of an existing product is not allowed."}
+                    )
 
         return attrs
 
