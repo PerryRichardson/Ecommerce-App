@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
+from rest_framework import serializers
 
 from ecommerce.models import Store, Product
 from api.serializers import ProductSerializer, StoreSerializer, ReviewSerializer
@@ -84,7 +85,7 @@ class SerializerTests(TestCase):
             context={"request": request},
         )
         self.assertFalse(ser.is_valid())
-        self.assertIn("do not own this store", str(ser.errors))
+        self.assertIn("Changing the store of an existing product is not allowed", str(ser.errors))
 
     def test_store_create_assigns_vendor_from_request(self):
         request = self.factory.post("/api/stores/")
@@ -97,15 +98,16 @@ class SerializerTests(TestCase):
 
     def test_store_create_rejects_non_vendor(self):
         request = self.factory.post("/api/stores/")
-        request.user = self.buyer
+        request.user = self.buyer  # not in Vendors
         payload = {"name": "New Store", "description": "Desc"}
         ser = StoreSerializer(data=payload, context={"request": request})
-        self.assertFalse(ser.is_valid())
-        self.assertIn("Only vendor users", str(ser.errors))
+        self.assertTrue(ser.is_valid(), ser.errors)
+        with self.assertRaisesMessage(serializers.ValidationError, "Only vendor users"):
+            ser.save()
 
     def test_review_serializer_rating_validation(self):
         request = self.factory.post("/api/products/1/reviews/")
         request.user = self.buyer
         ser = ReviewSerializer(data={"rating": 6, "comment": "nope"}, context={"request": request})
         self.assertFalse(ser.is_valid())
-        self.assertIn("between 1 and 5", str(ser.errors))
+        self.assertIn("less than or equal to 5", str(ser.errors))

@@ -31,8 +31,24 @@ class ProductViewTests(TestCase):
         self.vendor = User.objects.create_user("vendor1", password="x")
         self.other_vendor = User.objects.create_user("vendor2", password="x")
         self.buyer = User.objects.create_user("buyer1", password="x")
-        ensure_group("Vendors").user_set.add(self.vendor, self.other_vendor)
-        ensure_group("Buyers").user_set.add(self.buyer)
+
+        vendors_group = ensure_group("Vendors")
+        buyers_group = ensure_group("Buyers")
+
+        vendors_group.user_set.add(self.vendor, self.other_vendor)
+        buyers_group.user_set.add(self.buyer)
+
+        # Ensure vendor and groups DON'T start with the price-change permission
+        ct = ContentType.objects.get(app_label="ecommerce", model="product")
+        self.price_perm = Permission.objects.get(
+            content_type=ct, codename="can_change_product_price"
+        )
+        vendors_group.permissions.remove(self.price_perm)
+        for g in self.vendor.groups.all():
+            g.permissions.remove(self.price_perm)
+        self.vendor.user_permissions.remove(self.price_perm)
+        # Re-fetch to clear any cached perms on the user instance
+        self.vendor = User.objects.get(pk=self.vendor.pk)
 
         # Stores
         self.store = Store.objects.create(
@@ -117,6 +133,12 @@ class ProductViewTests(TestCase):
     def test_product_update_only_owner_and_price_permission(self):
         self.client.force_authenticate(self.vendor)
 
+        # Sanity check: vendor starts WITHOUT the price permission
+        self.assertFalse(
+            self.vendor.has_perm("ecommerce.can_change_product_price"),
+            "Vendor unexpectedly already has the price-change permission!",
+        )
+
         # Update name OK (owner)
         res = self.client.patch(
             self.product_detail(self.prod.pk),
@@ -126,7 +148,7 @@ class ProductViewTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data["name"], "Renamed")
 
-        # Update price without permission -> 403 from view perform_update()
+        # Update price without permission -> should be 403
         res = self.client.patch(
             self.product_detail(self.prod.pk),
             {"price": "99.99"},
@@ -134,12 +156,13 @@ class ProductViewTests(TestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Grant custom permission scoped to ecommerce.Product and try again
-        ct = ContentType.objects.get(app_label="ecommerce", model="product")
-        perm = Permission.objects.get(
-            content_type=ct, codename="can_change_product_price"
-        )
-        self.vendor.user_permissions.add(perm)
+        # Grant the custom permission and try again
+        self.vendor.user_permissions.add(self.price_perm)
+
+        # >>> IMPORTANT: refresh and re-authenticate so request.user sees new perms
+        self.vendor = User.objects.get(pk=self.vendor.pk)  # refresh_from_db()
+        self.client.force_authenticate(None)               # clear old auth
+        self.client.force_authenticate(self.vendor)        # re-auth with updated user
 
         res = self.client.patch(
             self.product_detail(self.prod.pk),
@@ -170,7 +193,7 @@ class ProductViewTests(TestCase):
         res = self.client.delete(self.product_detail(self.prod.pk))
         self.assertIn(res.status_code, (status.HTTP_204_NO_CONTENT, status.HTTP_200_OK))
 
-    # ---------- Stores: create restricted to Vendors; vendor set from request ----------
+    # ---------- Stores ----------
 
     def test_store_create_sets_vendor_and_restricts_non_vendor(self):
         # Non-vendor rejected
@@ -188,8 +211,6 @@ class ProductViewTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data["vendor"], self.vendor.id)
 
-    # ---------- Stores: vendor-store-list and store-product-list ----------
-
     def test_vendor_store_list_filters_by_vendor(self):
         res = self.client.get(self.vendor_store_list(self.vendor.id))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -205,7 +226,7 @@ class ProductViewTests(TestCase):
         self.assertTrue(any(p["name"] == "Widget" for p in res.data))
         self.assertFalse(any(p["name"] == "Gadget" for p in res.data))
 
-    # ---------- Reviews: list public; create Buyers only; vendor self-review blocked ----------
+    # ---------- Reviews ----------
 
     def test_reviews_list_public(self):
         res = self.client.get(self.product_reviews(self.prod.pk))
@@ -215,10 +236,10 @@ class ProductViewTests(TestCase):
     def test_review_create_buyers_only_and_vendor_blocked(self):
         payload = {"rating": 5, "comment": "Great!"}
 
-        # Vendor (owner) reviewing own product -> 400 (blocked in perform_create)
+        # Vendor (owner) reviewing own product -> 403 (blocked)
         self.client.force_authenticate(self.vendor)
         res = self.client.post(self.product_reviews(self.prod.pk), payload, format="json")
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
         self.client.force_authenticate(None)
 
         # Buyer OK

@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any, Dict
 
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from ecommerce.models import Product, Store, Review
 
@@ -12,25 +13,20 @@ from ecommerce.models import Product, Store, Review
 class ProductSerializer(serializers.ModelSerializer):
     """
     Serializer for Product.
-
-    Hardening:
     - Validates non-negative price/stock.
-    - Enforces that only Vendors can create/update.
-    - Enforces that the logged-in vendor owns the target store.
-    - Forbids changing the store on update.
+    - Only Vendors can write; must own the store.
+    - Forbids changing store on update.
+    - Price update requires 'ecommerce.can_change_product_price'.
     """
 
-    # Helpful read-only context fields for responses
     store_name = serializers.ReadOnlyField(source="store.name")
     vendor_username = serializers.ReadOnlyField(source="store.vendor.username")
 
     class Meta:
         model = Product
-        fields = "__all__"  # keep all model fields (store, name, price, stock, ...)
-        # NOTE: Product does NOT have a direct 'vendor' FK (vendor is on Store).
+        fields = "__all__"
 
-    # ---- Field-level validators -------------------------------------------------
-
+    # ---- field-level ----
     def validate_price(self, value: Decimal) -> Decimal:
         if value is None:
             raise serializers.ValidationError("Price is required.")
@@ -39,23 +35,14 @@ class ProductSerializer(serializers.ModelSerializer):
         return value
 
     def validate_stock(self, value: int) -> int:
-        # Model uses PositiveIntegerField, but this gives a clearer API error.
         if value is None:
             raise serializers.ValidationError("Stock is required.")
         if value < 0:
             raise serializers.ValidationError("Stock must be ≥ 0.")
         return value
 
-    # ---- Object-level validator -------------------------------------------------
-
+    # ---- object-level ----
     def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Enforce permissions and ownership on writes.
-        - Auth required.
-        - User must be in Vendors group.
-        - User must own the store associated with the product.
-        - Do not allow changing the store on update.
-        """
         request = self.context.get("request")
         if request and request.method in ("POST", "PUT", "PATCH"):
             user = request.user
@@ -65,7 +52,6 @@ class ProductSerializer(serializers.ModelSerializer):
             if not user.groups.filter(name="Vendors").exists():
                 raise serializers.ValidationError("Only vendor users can modify products.")
 
-            # On create we expect 'store' in attrs; on update we fall back to instance.store
             store: Store | None = attrs.get("store") or getattr(self.instance, "store", None)
             if store is None:
                 raise serializers.ValidationError({"store": "This field is required."})
@@ -73,7 +59,6 @@ class ProductSerializer(serializers.ModelSerializer):
             if store.vendor_id != user.id:
                 raise serializers.ValidationError("You do not own this store.")
 
-            # Forbid changing the store on update
             if self.instance is not None and "store" in attrs:
                 incoming_store: Store = attrs["store"]
                 if incoming_store.pk != self.instance.store_id:
@@ -81,18 +66,24 @@ class ProductSerializer(serializers.ModelSerializer):
                         {"store": "Changing the store of an existing product is not allowed."}
                     )
 
+            # Friendly extra guard (decisive check also in `update`)
+            if self.instance is not None and "price" in attrs:
+                if not user.has_perm("ecommerce.can_change_product_price"):
+                    raise PermissionDenied("Missing 'ecommerce.can_change_product_price'.")
+
         return attrs
+
+    # ---- decisive guard for updates ----
+    def update(self, instance: Product, validated_data: Dict[str, Any]) -> Product:
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if "price" in validated_data:
+            if not user or not user.has_perm("ecommerce.can_change_product_price"):
+                raise PermissionDenied("Missing 'ecommerce.can_change_product_price'.")
+        return super().update(instance, validated_data)
 
 
 class StoreSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Store.
-
-    Hardening:
-    - Assigns vendor from request.user on create.
-    - Ensures the creator is authenticated and in Vendors group.
-    """
-
     vendor_username = serializers.ReadOnlyField(source="vendor.username")
 
     class Meta:
@@ -100,7 +91,6 @@ class StoreSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("vendor",)
 
-    # Optional: friendly validation
     def validate_name(self, value: str) -> str:
         if not value or not value.strip():
             raise serializers.ValidationError("Name cannot be blank.")
@@ -109,26 +99,15 @@ class StoreSerializer(serializers.ModelSerializer):
     def create(self, validated_data: Dict[str, Any]) -> Store:
         request = self.context.get("request")
         user = getattr(request, "user", None)
-
         if user is None or not user.is_authenticated:
             raise serializers.ValidationError("Authentication required.")
-
         if not user.groups.filter(name="Vendors").exists():
             raise serializers.ValidationError("Only vendor users can create stores.")
-
         validated_data["vendor"] = user
         return super().create(validated_data)
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    """
-    Serializer for product reviews.
-
-    Notes:
-    - product, user, verified, created_at are set server-side in the view.
-    - Model validators already restrict rating to 1..5; we add a friendly message.
-    """
-
     user_username = serializers.ReadOnlyField(source="user.username")
     product_name = serializers.ReadOnlyField(source="product.name")
 
